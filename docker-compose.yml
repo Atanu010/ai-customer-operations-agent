@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    network_mode: host
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_customer_ops}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_customer_ops -h 127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/ai_customer_ops
+      APP_NAME: ai-customer-operations-agent
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      LLM_PROVIDER: mock
+      MOCK_MODE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "python scripts/seed_database.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  postgres_data:
